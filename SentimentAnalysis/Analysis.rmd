@@ -24,7 +24,6 @@ knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE, cache = TRUE)
 
 Navigating to this Github repository and selecting a new text dataset to analyze: https://github.com/niderhoff/nlp-datasets
 
-
 ## Processing data
 1. Importing your data into R
 2. Performing  additional cleaning tasks as needed.
