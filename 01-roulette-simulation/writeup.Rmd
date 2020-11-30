@@ -1,0 +1,368 @@
+---
+title: "Martingale strategy"
+author: "__Muthu Subramanian__"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document: 
+    code_folding: hide
+    toc: yes
+    number_sections: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r global options, include = FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE, cache = TRUE)
+library(dplyr)
+```
+# Introduction
+This is a blog post to explain how I used computer simulation to understand the operating characteristics of the Martingale strategy. This is the most popular and commonly used roulette strategy. Since gambling involves mostly with people with more wealth, it's very unlikely to get bankrupt. The main reason why this doesn't have a 100% success rate is because no information about the past bets can be used to predict the future bets with accuracy. What this means in simpler words is, the assumptions and outcomes are independent. The bet is increased after every loss so that when the player eventually wins, the lost money is gained back and then the player starts betting with the initial amount from the beginning.
+
+
+# Background
+There was an article which I came across when I searched about this strategy being using in Roulette. The strategy was named after John Henry Martindale, whose name was later mutilated to Martingale. J. H.He was a casino owner in London. He always wants to win and encouraged the players to double the bets and finally his casino was in trouble. After many many years, this was used by Charles Wells who broke into the bank more than 10 times with 3 days in Monte Carlo. He started the play with 4,000 francs, but he brought home 1,000,000 francs! This sounds interesting but we cannot always expect a profit in this strategy..
+
+![](/Users/audacious/Desktop/RScripts/probability-and-inference-portfolio-muthusubramanian-meena/Images/Roulette.png)
+
+
+# Methods
+There are several strategies for playing roulette.
+
+![](/Users/audacious/Desktop/RScripts/probability-and-inference-portfolio-muthusubramanian-meena/Images/Table.png)
+
+Let's Consider one such strategy:
+￼
+This is a classic roulette strategy called the “Martingale” strategy.
+
+We can either choose numbers or colours. For our blog post, Let us consider only the colours. The table has colours of red, black and green. A pocket is being selected randomly and the gambler may wage on several aspects of the outcome. He can place a wager that the randomnly selected pocket will be either red/black/green.
+
+
+
+|Colour  |	No. of pockets |	
+|:------:|:---------------:|
+|Green   |  2              |  
+|Red     |  18             |  
+|Black   |  18             |  
+
+
+For example : If a gambler bets $1 on black and the randomly selected pocket is black, then the gambler will get the original $1 wager and an additional $1 as winnings.
+
+ 
+
+Consider how the strategy playes out for a single sequence of spins {Black, Black, Red}.
+
+The blow sequence is taken with the followign outcome in which the gambler chose to wager money on the outcome -> Red.
+
+|Play|	Wager|	Outcome|	Earnings |
+|:--:|:-----:|:-------:|:---------:|
+|1	 |1	     |  Black  |  	-1     |
+|2	 |2	     |Black	   |   -3      |
+|3	 |4	     |Red	     |   +1      |
+
+- The gambler lost their wager the first round.
+- He bets $2 the second round.
+- The gambler lost the money also. 
+- So, he bets $3 again and now
+- Fortunately gets a profit of $1 only after third spin.
+
+
+
+Now consider a sequence {Black, Black, Black, Red}.
+
+|Play|	Wager|	Outcome|	Earnings |
+|:--:|:-----:|:-------:|:---------:|
+|1	 |1	     |  Black  |  	-1     |
+|2	 |2	     |Black	   |   -3      |
+|3	 |4	     |Black	   |   -7      |
+|4	 |8	     |Red	     |   +1      |
+
+The Martingale strategy appears to always end in positive earnings, regardless of how unlucky a string of spins may be. But it cannot be always profitable.
+
+***
+# Martingale strategy simulation 
+
+Lets simulate the martingale strategy to find the avg earnings of a gambler. 
+We have an assumption that the gambler wagers on the spin selecting a red pocket with a P of 18/38.
+The Parameters are B, W, L and M for which the explanation is given below.
+Using the parameters, a series of single spins are done in which the win or loss ( outcome ) is used to determine if the wager in the next spin is $1. (red previous spin)
+It can also be double the previous wager ( black/green spin)
+This keeps on going until the gambler is out of money, hits the max no. of plays or reaches the threshold for stopping successfully.
+***
+
+***
+__Additional assumptions for the simulation__  
+__Stopping rule__  
+-A player will use the above strategy and play until the player has *W dollars*  
+-The player goes bankrupt  
+-The player completes L wagers (or plays)  
+
+__Budget__  
+-The player starts with B dollars  
+-The player cannot wager more money than he/she has.  
+
+__Maximum wager__
+Some casinos have a maximum bet. Call this parameter M. If the strategy directs the player to wager more than M dollars, then the player will only wager M dollars
+
+***
+__Parameters__  
+`B` Starting budget -  $200  
+`W` Winnings threshold for stopping -	$300 (Starting budget + $100 winnings)   
+`L` Time threshold for stopping -	1000 play  
+`M` Casino’s maximum wager -	$100  
+
+
+```{R}
+#' A single play of the Martingale strategy
+#'
+#' Takes a state list, spins the roulette wheel, returns the state list with updated values (for example, budget, plays, etc)
+#' @param state A list with the following entries: 
+#'   B              number, the budget
+#'   W              number, the budget threshold for successfully stoping
+#'   L              number, the maximum number of plays 
+#'   M              number, the casino wager limit
+#'   plays          integer, the number of plays executed
+#'   previous_wager number, the wager in the previous play (0 at first play)
+#'   previous_win   TRUE/FALSE, indicator if the previous play was a win (TRUE at first play)
+#' @return The updated state list
+one_play <- function(state){
+  
+    # Wager
+    proposed_wager <- ifelse(state$previous_win, 1, 2*state$previous_wager)
+    wager <- min(proposed_wager, state$M, state$B)
+    
+    # Spin of the wheel
+    red <- rbinom(1,1,18/38)
+    
+    # Update state
+    state$plays <- state$plays + 1
+    state$previous_wager <- wager
+    if(red){
+      # WIN
+      state$B <- state$B + wager
+      state$previous_win <- TRUE
+    }else{
+      # LOSE
+      state$B <- state$B - wager
+      state$previous_win <- FALSE
+    }
+  state
+}
+
+
+#' Stopping rule
+#'
+#' Takes the state list and determines if the gambler has to stop
+#' @param state A list.  See one_play
+#' @return TRUE/FALSE
+stop_play <- function(state){
+  if(state$B <= 0) return(TRUE)
+  if(state$plays >= state$L) return(TRUE)
+  if(state$B >= state$W) return(TRUE)
+  FALSE
+}
+
+
+#' Play roulette to either bankruptcy, success, or play limits
+#'
+#' @param B number, the starting budget
+#' @param W number, the budget threshold for successfully stoping
+#' @param L number, the maximum number of plays 
+#' @param M number, the casino wager limit
+#' @return A vector of budget values calculated after each play.
+one_series <- function(
+    B = 200
+  , W = 300
+  , L = 1000
+  , M = 100
+){
+
+  # initial state
+  state <- list(
+    B = B
+  , W = W
+  , L = L
+  , M = M
+  , plays = 0
+  , previous_wager = 0
+  , previous_win = TRUE
+  )
+  
+  # vector to store budget over series of plays
+  budget <- rep(NA, L)
+  
+  # For loop of plays
+  for(i in 1:L){
+    new_state <- state %>% one_play
+    budget[i] <- new_state$B
+    if(new_state %>% stop_play){
+      return(budget[1:i])
+    }
+    state <- new_state
+  }
+  budget    
+}
+
+# helper function
+get_last <- function(x) x[length(x)] 
+
+
+#Figure to show a single gambler's earnings/losses over a series of wagers. 
+
+one_play_person <- one_series(B=200, W=300, L=1000, M=100)
+plot(x=c(1:length(one_play_person)),y=one_play_person,type="l",xlab="Play no",ylab="Money in pocket")
+
+
+```
+
+```{R}
+# Simulation
+walk_out_money <- rep(NA, 10000)
+for(j in seq_along(walk_out_money)){
+  walk_out_money[j] <- one_series(B = 200, W = 300, L = 1000, M = 100) %>% get_last
+}
+
+# Walk out money distribution
+hist(walk_out_money, breaks = 100)
+
+# Estimated probability of walking out with extra cash
+mean(walk_out_money > 200)
+
+# Estimated earnings
+mean(walk_out_money - 200)
+
+```
+The given histogram shows us that 50% of the time the gambler comes out with earning with winning plays and the remaining time with 0 or negative earnings at a loss. The probability of walking out with a profit is 0.5141 with the avg earnings of -47.3022. What it means is that, the gambler would make a profit but however over a longer run of gambling with this strategy doesn't work.
+
+The estimated probability of walking out with extra cash is - `r mean(walk_out_money > 200)` and The estimated earnings would be on average - ` r mean(walk_out_money - 200)`
+
+Less than half of the time, we walk out with extra cash. We see from the histogram that, our earning are negative. These parameters do not fit for an ideal gambling game and according to me, since this benefits in a loss, I think this is not recommended. 
+
+
+# Changing a parameter of the simulation. 
+
+- I do not actually know how changing the parametrs impact the gambler's chances, but I think these are some of the factor which affect the strategy.  
+- Evrything seems to be an assumption - B, W, L and M. Even by changing at least one parameter, it changed the average earnings completely and the plays were largely increased before stopping the game. I remember seeing many strategies and every strategy using different rules and it's own definition for pockets and colors. With my understanding, I feel that the player would be at a loss and this is not an effective one while playing Roulette
+
+```{R}
+# Simulation
+walk_out_money <- rep(NA, 10000)
+for(j in seq_along(walk_out_money)){
+  walk_out_money[j] <- one_series(B = 200, W = 300, L = 10, M = 100) %>% get_last
+}
+
+# Walk out money distribution
+hist(walk_out_money, breaks = 100)
+
+# Estimated probability of walking out with extra cash
+mean(walk_out_money > 200)
+
+# Estimated earnings
+mean(walk_out_money - 200)
+
+```
+
+
+L is changed to 10. L refers to ->Time threshold for stopping -	1000 play. Hoping for a gain for 100 simulation, but I saw that there's no profit. So, this is even not beneficial even though, the gambler walks out with zero average earnings and walks out with more than 50%. Estimated probability of walking out with extra cash is `r mean(walk_out_money > 200)` and  Estimated earnings is `rmean(walk_out_money - 200)`
+
+
+```{r}
+
+
+max_num_plays = seq(10, 1000, by=10)
+avg.earn = NA
+
+for(i in c(1:length(max_num_plays))){
+  
+
+# Simulation
+walk_out_money <- rep(NA, 10000)
+for(j in seq_along(walk_out_money)){
+  walk_out_money[j] <- one_series(B = 200, W = 300, L = 10, M = 100) %>% get_last
+}
+
+
+# Estimated earnings
+avg.earn[i] = mean(walk_out_money - 200)
+}
+
+plot(x=max_num_plays,y=avg.earn,type="l")
+```
+
+We start out with 10 numner of plays and avg earnings as zero and we go upto 1000 with a negative avg earnings. If we increase L and leave the rest as default, in most it would hold but 
+
+We started out wih 10 as amx no. of plays. As I changed the no. of plays, the avg changes. 
+
+#Avg Number of plays
+
+We have num of plays from 1 to 10000.  in se along till the length. For each play, we are running through one_series and for avg no. of plays, we are taking the length which is the dollar amount from each series. We area plotting the histogram of the values. The defualt avg no. of plays was around 200. If the avg is not greater than 500, we are never reaching 10000. The avg no. of plays is definitely less than "L". So, it may happen,  but it could also never happen. So, it's ambigious to tell if it ever stops because we reach the man number of plays in this scenario. 
+
+The peak is at 200. The gambler stopped in between 0 ad 300. 
+
+
+#Default
+```{R}
+# Simulation
+num.plays <- rep(NA, 10000)
+for(j in seq_along(num.plays)){
+  num.plays[j] <- one_series(B = 200, W = 300, L = 1000, M = 100) %>% length()
+}
+
+# Walk out money distribution
+hist(num.plays, breaks = 100)
+
+# Average no. of plays
+#mean(num.plays)
+```
+
+Here, we are calculating the avg no. of plays for the changed parameters where L = 10. 
+
+#Changed
+
+
+```{R}
+# Simulation
+num.plays <- rep(NA, 10000)
+for(j in seq_along(num.plays)){
+  num.plays[j] <- one_series(B = 200, W = 300, L = 10, M = 100) %>% length()
+}
+
+# Walk out money distribution
+hist(num.plays, breaks = 100)
+
+# Average no. of plays
+#mean(num.plays)
+```
+
+#Stopping rule 
+
+Here, we have L = 10. 10 IS THE AVG NO. o fplays because 98 ppl had 10 as their avg no. of plays. Almost everyone is stopping where the  third stopping reason is they reached the max no. of plays. Since this is too close to L, almost every player is stopping.
+
+_Stopping rule__  
+-A player will use the above strategy and play until the player has *W dollars*  
+-The player goes bankrupt  
+-The player completes L wagers (or plays)  
+
+
+
+# Limitations
+
+- The change in paramter limits the amount of money we walk out with and it stops for the third reason. It limits the end performance. 
+
+- this strategy is not profitable since the value is in negative with the default given values.. It's nnot always positive.
+
+- The problem with the casino strategies usually comes from the question if the system actually works, as normally, casino players are looking for a betting strategy that would help them beating the house advantage.
+
+- Although it might be a simpe game with high winning odds, roulette can be very addictive. People who play roulette for profit easily fall victim to this, and small winning bets encourage them to keep playing on. But the fact is that, the casino knows just how to make its income from it. Prolonged play can make people lose track of their gambling expenses and the player run out of money sooner than expected.
+
+- The game is completely random – Of all the characteristics of roulette, the game’s complete reliance on chance is what many average and experienced players have taken for granted. The long time neglect for this fact has caused so many people to create and use “strategies” and systems based on supposed patterns or trends in the roulette wheel. Despite seeming consistencies that occasionally come up, a normal unbiased roulette wheel is 100% random, and no single calculation can predict where the ball is landing next. 
+
+- Thus, the game presents no room for any tactical element, and even proven betting systems end up heavily flawed. Like any other casino game, roulette has its own advantages, but does not come off without suffering the players a few big consequences. Roulette sure is a simple yet entertaining game but comes with huge loss of money too.
+
+
+
+# Results  
+The purpose of martingale strategy is to determine the average outcomes for the roulette game.
+Having $200 as the starting budget and $300 as the winning threshold for stopping for 1000 plays with a maximum wager of $100.
+This strategy has it's own limitations. In just a few losses, you will have to make huge wagers, thus quickly reaching the maximum bet size at the table. Using the Martingale, we will quickly reach the maximum bet size at a table which makes this stratgey less inefficient. One losing strike is enough to make the player bankrupt.While each spin is independent on the previous ones, the winning odds doesn't change with the previous bets. Only the size of the bet gets increased.
+
+
