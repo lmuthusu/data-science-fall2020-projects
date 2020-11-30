@@ -1,5 +1,5 @@
 ---
-title: "Sentiment Analysis.Rmd"
+title: "Sentiment Analysis"
 author: "Meena Muthusubramanian"
 date: "10/29/2020"
 output:
@@ -27,7 +27,6 @@ Navigating to this Github repository and selecting a new text dataset to analyze
 ## Processing data
 1. Importing your data into R
 2. Performing  additional cleaning tasks as needed.
-
 
 ```{R}
 #Installing packages needed for text analysis.
